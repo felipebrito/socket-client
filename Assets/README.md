@@ -219,3 +219,98 @@ O aplicativo pode funcionar sem conexão ao servidor:
 ## Licença
 
 Todos os direitos reservados. 
+
+# Socket-Cliente VR 🎮
+
+Este é um cliente VR desenvolvido em Unity para visualização de vídeos 360° com controle remoto via WebSocket.
+
+## 📁 Estrutura do Projeto
+
+```
+Socket-Cliente/
+├── Assets/
+│   ├── Materials/          # Materiais e shaders para vídeo e fade
+│   ├── Scenes/            # Cenas do Unity
+│   │   └── VR player.unity  # Cena principal do player VR
+│   ├── Scripts/           # Scripts C#
+│   │   ├── VRManager.cs     # Gerenciador principal
+│   │   ├── RotationDebugUI.cs  # Interface de debug
+│   │   └── ConnectionHelper.cs  # Helper para conexão WebSocket
+│   ├── StreamingAssets/   # Vídeos locais (*.mp4)
+│   └── TextMesh Pro/      # Pacote para UI de texto
+├── Packages/              # Dependências do Unity
+└── ProjectSettings/       # Configurações do projeto
+```
+
+## 🎯 Funcionalidades
+
+- Reprodução de vídeos 360° em VR
+- Controle remoto via WebSocket
+- Sistema de debug visual para rotação
+- Suporte a vídeos locais e externos
+- Controle de rotação com limites configuráveis
+- Interface de diagnóstico em tempo real
+
+## 🛠️ Configuração
+
+1. Abra o projeto no Unity 2022.3 ou superior
+2. Configure o IP do servidor WebSocket em `VRManager.cs`
+3. Adicione seus vídeos 360° na pasta `StreamingAssets`
+4. Configure o XR Plugin Management para sua plataforma (Oculus, etc.)
+
+## 🎮 Controles no Editor
+
+- Setas: Rotação da câmera
+- Espaço: Resetar rotação
+- F: Alternar foco manual
+- Debug UI: Disponível no canto inferior direito
+
+## 🔧 Debug e Diagnóstico
+
+- Interface visual para debug de rotação
+- Monitoramento de conexão WebSocket
+- Indicadores de estado do player
+- Logs detalhados no modo diagnóstico
+
+## 📝 Notas Importantes
+
+- Os vídeos devem estar no formato MP4 com codificação H.264
+- Recomendado usar vídeos 360° equiretangulares
+- O sistema suporta carregamento de vídeos externos (Downloads)
+- Modo offline disponível para testes sem servidor
+
+## 🔄 Comandos WebSocket
+
+- `play:video.mp4` - Inicia reprodução
+- `pause` - Pausa o vídeo
+- `resume` - Retoma reprodução
+- `stop` - Para o vídeo
+- `seek:seconds` - Pula para tempo específico
+
+## 🎥 Restrições de Visualização
+
+O sistema suporta restrições de rotação em momentos específicos dos vídeos:
+- Ângulos máximos configuráveis
+- Retorno suave ao centro
+- Intervalos de bloqueio por vídeo
+
+## 🚀 Performance
+
+- Otimizado para Meta Quest
+- Suporte a diferentes resoluções de vídeo
+- Gerenciamento automático de memória
+- Sistema de fallback para conexões instáveis
+
+## 💡 Dicas
+
+1. Use o modo diagnóstico para depuração
+2. Configure os limites de rotação no Inspector
+3. Teste offline antes de conectar ao servidor
+4. Verifique os logs para problemas de conexão
+
+## 🔒 Segurança
+
+- Validação de comandos WebSocket
+- Proteção contra overflow de buffer
+- Reconexão automática segura
+- Tratamento de erros robusto 
