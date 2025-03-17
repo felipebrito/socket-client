@@ -1,5 +1,37 @@
 # VR Player - Sistema de Vídeo 360°
 
+## Atualizações Recentes
+
+### Março 2024
+
+**1. Reorganização da Estrutura do Projeto**
+- Corrigida a estrutura do projeto para seguir os padrões do Unity
+- Removida duplicação de pastas e arquivos
+- Organização hierárquica mais limpa e eficiente
+
+**2. Integração com GitHub**
+- Adicionado sistema de gerenciamento de versão diretamente no Unity
+- Menu "Ferramentas > GitHub" com opções para:
+  - Commit de alterações (Ctrl+Shift+G)
+  - Visualização de histórico
+  - Atualização do repositório (pull)
+  - Verificação de status
+
+**3. Compatibilidade com Meta Quest 3**
+- Melhorias de renderização para experiência 360° em VR
+- Otimização para tela cheia no Meta Quest 3
+- Configuração automática para melhor desempenho em VR
+
+**4. Diagnóstico e Correção de Visualização 360°**
+- Adicionada ferramenta de diagnóstico para verificação de configurações VR (Ctrl+Shift+V)
+- Corrigidos problemas de visualização em janela pequena versus tela cheia 360°
+- Melhorias no sistema de renderização da esfera de vídeo
+
+**5. Compilação para Windows**
+- Menu dedicado para compilação do projeto para Windows (Ctrl+Shift+B)
+- Interface amigável para seleção de opções de build
+- Preservação das configurações do Android após compilação
+
 ## Estrutura da Cena
 ```
 📂 VR player*
@@ -46,32 +78,62 @@
 - Gerencia conexão com servidor
 - Implementa sistema de debug
 
-## Sistema de Debug
+## Sistema de Rotação e Limitação de Visualização
 
-O sistema inclui uma janela de debug no editor Unity (Window > VR > Rotation Debug) que permite:
-- Habilitar/desabilitar visualização de debug
-- Controlar bloqueio de rotação
-- Ajustar limites de ângulos vertical/horizontal
-- Monitorar rotação da câmera e VideoSphere
-- Visualizar diferença relativa entre câmera e VideoSphere
+O sistema agora inclui dois componentes complementares:
 
-## Controles no Editor
-- Setas: Rotação do VideoSphere
-- Espaço: Reset da rotação
-- F: Ativar/desativar foco manual
-- Rotação pode ser bloqueada via interface de debug
+### CameraRotationLimiter
+Este componente controla as restrições de ângulo de visualização:
+- Define um ângulo máximo de rotação permitido (padrão: 75°)
+- Monitora a rotação da câmera em tempo real
+- Reposiciona suavemente quando o usuário ultrapassa o limite
+
+### VideoRotationControl
+Controla quando as restrições devem ser aplicadas:
+- Define blocos de tempo para cada vídeo
+- Ativa/desativa o limitador com base no progresso do vídeo
+- Permite configurar ângulos diferentes para momentos específicos
+
+## Instalação do Oculus Integration (Opcional)
+
+Para obter a melhor experiência VR no Meta Quest:
+
+1. Abra o Unity Asset Store (menu Window > Asset Store)
+2. Busque por "Oculus Integration" e baixe o pacote gratuito
+3. Após o download, clique em "Import" 
+4. Durante a importação:
+   - Responda "Yes" para atualizar o Oculus Utilities
+   - Quando perguntado sobre o XR Plugin Management, selecione "Yes"
+5. Após a instalação:
+   - Abra o arquivo VRManager.cs
+   - Descomente a linha `//#define USING_OCULUS_SDK` no início do arquivo
+   - Salve o arquivo
+
+## Ferramentas de Desenvolvimento
+
+### Diagnóstico VR (Ctrl+Shift+V)
+- Verifica configurações do projeto para compatibilidade com VR
+- Analisa configurações da plataforma (Android, XR Management)
+- Verifica a presença de componentes essenciais na cena
+- Oferece recomendações para otimização
+
+### Compilação Windows (Ctrl+Shift+B)
+- Interface para configuração da compilação
+- Opções para build de desenvolvimento
+- Preservação de configurações entre plataformas
+
+### GitHub (Ctrl+Shift+G)
+- Interface para gerenciamento de versões
+- Visualização de status e alterações
+- Commits com mensagens explicativas (changelog)
+- Push automático opcional
 
 ## Notas Importantes
-1. No editor, a rotação é aplicada ao VideoSphere
-2. No Quest/VR, o sistema detecta automaticamente a câmera correta
-3. O Canvas está em modo World Space para melhor visualização em VR
-4. Sistema de bloqueio pode ser configurado por intervalos de tempo em cada vídeo
+1. O código possui adaptações para funcionar com ou sem o Oculus Integration
+2. O modo 360° completo é otimizado para Meta Quest 3 
+3. O sistema de limitação de rotação trabalha de forma integrada com o controlador de vídeos
 
-# VR Video Player com Controle de Rotação
-
-Aplicativo de visualização de vídeos em VR com controle de rotação, pontos focais automáticos e interface de administração via WebSocket.
-
-## Características Principais
+# Características Gerais
 
 - Reprodução de vídeos 360° em VR
 - Sistema de controle de rotação com pontos focais
@@ -81,140 +143,14 @@ Aplicativo de visualização de vídeos em VR com controle de rotação, pontos 
 - Reprodução local dos vídeos (não requer streaming)
 - Sistema de bloqueio de visualização configurável
 - Suporte para múltiplos vídeos
+- Integração direta com GitHub para controle de versão
 
 ## Requisitos
 
 - Unity 2022.3 ou superior
-- Oculus Integration Package
 - Android Build Support (para builds Quest)
-- Meta Quest 1 ou 2
-
-## Estrutura do Projeto
-
-```
-Assets/
-├── Scripts/
-│   ├── VRManager.cs           # Gerenciador principal do sistema VR
-│   └── SmoothOrbitFollower.cs # Sistema de órbita suave para objetos
-├── Scenes/
-│   └── Main.unity            # Cena principal do aplicativo
-└── StreamingAssets/         # Pasta alternativa para vídeos (opcional)
-```
-
-## Configuração de Vídeos
-
-Os vídeos são reproduzidos diretamente do dispositivo, não necessitando de streaming ou múltiplos builds:
-
-1. **Formato Recomendado**:
-   ```bash
-   ffmpeg -y -hwaccel cuda -hwaccel_output_format cuda -i "video_original.mp4" \
-   -c:v hevc_nvenc -preset p1 -tune hq -rc:v vbr_hq \
-   -b:v 12M -maxrate 15M -bufsize 20M -spatial-aq 1 \
-   -vf "scale_cuda=3072:1536" -c:a aac -b:a 128k -ac 2 "video_convertido.mp4"
-   ```
-
-2. **Localização dos Vídeos**:
-   - Pasta `Download` do Quest (recomendado)
-   - StreamingAssets do aplicativo (alternativa)
-   - Configurável via `useExternalStorage` no VRManager
-
-## Comunicação WebSocket
-
-### Conexão
-- URL padrão: `ws://192.168.1.30:8181`
-- Configurável via `serverUri` no VRManager
-- Reconexão automática em caso de falha
-
-### Comandos Disponíveis
-
-| Comando | Formato | Descrição | Exemplo |
-|---------|---------|-----------|---------|
-| Play | `play:filename.mp4` | Inicia reprodução de vídeo | `play:rio.mp4` |
-| Pause | `pause` | Pausa o vídeo atual | `pause` |
-| Resume | `resume` | Retoma reprodução | `resume` |
-| Stop | `stop` | Para a reprodução | `stop` |
-| Seek | `seek:seconds` | Pula para tempo específico | `seek:120` |
-| Mensagem | `aviso:texto` | Exibe mensagem na interface | `aviso:Iniciando tour` |
-
-### Respostas do Cliente
-
-| Mensagem | Formato | Descrição |
-|----------|---------|-----------|
-| Timecode | `TIMECODE:seconds` | Tempo atual do vídeo |
-| Status | `STATUS:state` | Estado atual do player |
-| Info | `CLIENT_INFO:data` | Informações do dispositivo |
-
-## Sistema de Bloqueio de Visualização
-
-O sistema permite definir momentos específicos onde a visualização é restrita:
-
-```csharp
-public class LockTimeRange {
-    public float startTime;    // Tempo inicial em segundos
-    public float endTime;      // Tempo final em segundos
-    public float maxAngle;     // Ângulo máximo de rotação permitido
-    public float resetSpeed;   // Velocidade de retorno ao centro
-}
-```
-
-### Configuração via Unity Editor
-1. Selecione o VRManager na cena
-2. Expanda "Lock Time Ranges"
-3. Configure os intervalos para cada vídeo
-4. Ajuste ângulos e velocidades conforme necessário
-
-## Modo Offline
-
-O aplicativo pode funcionar sem conexão ao servidor:
-
-1. **Ativação**:
-   - Automática após falhas de conexão
-   - Manual via `offlineMode = true`
-   - Após timeout configurável
-
-2. **Funcionalidades**:
-   - Carregamento automático do primeiro vídeo
-   - Interface de diagnóstico
-   - Manutenção de todas funcionalidades locais
-
-## Features Adicionais
-
-1. **Sistema de Diagnóstico**:
-   - Logs detalhados
-   - Interface de debug in-game
-   - Monitoramento de conexão
-
-2. **Gerenciamento de Memória**:
-   - Liberação automática de recursos
-   - Controle de carregamento de vídeos
-   - Otimização para VR
-
-3. **Transições Suaves**:
-   - Fade in/out entre vídeos
-   - Interpolação suave de rotação
-   - Retorno suave ao ponto focal
-
-4. **Permissões Android**:
-   - Solicitação automática de acesso ao armazenamento
-   - Fallback para StreamingAssets
-   - Tratamento de erros de permissão
-
-## Solução de Problemas
-
-1. **Vídeos não carregam**:
-   - Verifique o formato do vídeo
-   - Confirme as permissões de armazenamento
-   - Verifique o caminho configurado
-
-2. **Problemas de Conexão**:
-   - Verifique o endereço do servidor
-   - Confirme a rede local
-   - Verifique logs de diagnóstico
-
-3. **Problemas de Rotação**:
-   - Verifique configurações de bloqueio
-   - Ajuste valores de maxAngle e resetSpeed
-   - Confirme orientação inicial do vídeo
+- Meta Quest 2/3 para experiência VR completa
+- Oculus Integration Package (opcional, recomendado)
 
 ## Licença
 
