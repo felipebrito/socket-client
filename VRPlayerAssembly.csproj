@@ -69,6 +69,7 @@
     <Compile Include="Assets\Scripts\RotationDebugUI.cs" />
     <Compile Include="Assets\Scripts\SmoothOrbitFollower.cs" />
     <Compile Include="Assets\Scripts\Editor\RemoveViewSetupMenu.cs" />
+    <Compile Include="Assets\Scripts\Editor\SimulationTest.cs" />
     <Compile Include="Assets\Scripts\Editor\AparatoMenuHelper.cs" />
     <Compile Include="Assets\Scripts\Editor\AparatoEditorUtils.cs" />
     <Compile Include="Assets\Scripts\EmergencyStartup.cs" />
