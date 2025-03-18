@@ -1,0 +1,16 @@
+<linker>
+  <!-- Preserva todo o assembly Newtonsoft.Json para evitar problemas de IL2CPP stripping -->
+  <assembly fullname="Newtonsoft.Json" preserve="all"/>
+  <assembly fullname="System" preserve="all"/>
+  <assembly fullname="System.Core" preserve="all"/>
+  <assembly fullname="mscorlib" preserve="all"/>
+  
+  <!-- Preserva todos os tipos utilizados pelo SocketIOUnity -->
+  <assembly fullname="SocketIOClient" preserve="all"/>
+  <assembly fullname="SocketIOClient.Newtonsoft.Json" preserve="all"/>
+  
+  <!-- Adicionalmente, preserva namespaces específicos -->
+  <assembly fullname="Assembly-CSharp">
+    <namespace fullname="*" preserve="all"/>
+  </assembly>
+</linker> 
