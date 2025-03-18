@@ -1,49 +1,47 @@
-Shader "Unlit/UnlitFade"
+Shader "Custom/UnlitFade"
 {
     Properties
     {
-        _Color ("Color", Color) = (0,0,0,1)
+        _Color ("Fade Color", Color) = (0,0,0,1)
     }
     SubShader
     {
-        Tags { "Queue" = "Transparent" "RenderType" = "Transparent" }
-        LOD 100
-        Blend SrcAlpha OneMinusSrcAlpha
+        Tags { "Queue"="Overlay" "RenderType"="Transparent" }
+        Cull Front // Mantém a inversão para VR
         ZWrite Off
-        Cull Front
+        Blend SrcAlpha OneMinusSrcAlpha
 
         Pass
         {
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            
             #include "UnityCG.cginc"
 
-            struct appdata
+            struct appdata_t
             {
                 float4 vertex : POSITION;
             };
 
             struct v2f
             {
-                float4 vertex : SV_POSITION;
+                float4 pos : SV_POSITION;
             };
 
-            float4 _Color;
-            
-            v2f vert (appdata v)
+            fixed4 _Color;
+
+            v2f vert(appdata_t v)
             {
                 v2f o;
-                o.vertex = UnityObjectToClipPos(v.vertex);
+                o.pos = UnityObjectToClipPos(v.vertex);
                 return o;
             }
-            
-            fixed4 frag (v2f i) : SV_Target
+
+            fixed4 frag(v2f i) : SV_Target
             {
-                return _Color;
+                return _Color; // Usa a cor definida no material
             }
             ENDCG
         }
     }
-} 
+}

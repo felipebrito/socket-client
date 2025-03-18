@@ -1,21 +1,15 @@
 # Unity generated
-[Ll]ibrary/
 [Tt]emp/
 [Oo]bj/
 [Bb]uild/
 [Bb]uilds/
+[Ll]ibrary/
 [Ll]ogs/
-[Uu]ser[Ss]ettings/
+UserSettings/
 
-# Never ignore Asset meta data
-![Aa]ssets/**/*.meta
-
-# Visual Studio / VS Code / Rider generated
+# Visual Studio / MonoDevelop generated
 .vs/
 .vscode/
-.idea/
-*.csproj
-*.unityproj
 *.sln
 *.suo
 *.tmp
@@ -55,6 +49,9 @@ crashlytics-build.properties
 Icon?
 ehthumbs.db
 Thumbs.db
+
+# Never ignore Asset meta data
+![Aa]ssets/**/*.meta
 
 # Oculus/VR specific
 /[Aa]ssets/Oculus/

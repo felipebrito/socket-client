@@ -1,88 +1,86 @@
-# Guia de Configuração de Bloqueio de Rotação
+# Guia de Configuração e Uso do Sistema de Bloqueio de Visualização
 
-O sistema de bloqueio de rotação permite controlar os momentos em que o usuário pode olhar livremente pelo ambiente 360° e quando a visualização é restringida a uma área específica.
+Este guia explica como configurar e ajustar o sistema de bloqueio de visualização para vídeos 360°.
 
-## Conceitos Básicos
+## Introdução
 
-- **Bloqueio de Rotação**: Limita o quanto o usuário pode desviar seu olhar do ponto central.
-- **Intervalos de Tempo**: Define períodos específicos durante o vídeo onde o bloqueio é aplicado.
-- **Ângulo Máximo**: O limite (em graus) que o usuário pode desviar o olhar.
-- **Velocidade de Retorno**: Quão rápido a visualização retorna ao centro quando o usuário ultrapassa o limite.
+O sistema de bloqueio de visualização permite controlar a direção em que o usuário pode olhar durante determinados intervalos de tempo em vídeos 360°. Existem dois modos de bloqueio:
 
-## Configurando o Bloqueio de Rotação
+1. **Modo 0 - Inverter Rotação da Cabeça**: Bloqueia a visão na posição onde o usuário estava olhando quando o bloqueio foi ativado.
+2. **Modo 1 - Fixar em Ponto Específico**: Força o usuário a olhar para uma direção específica, independentemente de para onde ele esteja olhando.
 
-### No Inspector do Unity
+## Interface de Configuração no Editor
 
-1. Selecione o objeto com o componente `VRManager` na cena
-2. Na seção "Configurações de Rotação":
-   - Ative `Lock Rotation` para habilitar o sistema de bloqueio
-   - Configure `Max Horizontal Angle` para definir o limite horizontal (padrão: 45°)
-   - Configure `Max Vertical Angle` para definir o limite vertical (padrão: 30°)
-   - Ajuste `Reset Rotation Speed` para controlar a velocidade de retorno (padrão: 2)
+No Inspector do objeto que contém o componente `VRManager`, você encontrará uma seção chamada "Ferramentas de Configuração de Bloqueio" que permite configurar os intervalos de bloqueio para cada vídeo.
 
-### Configurando Intervalos de Bloqueio
+### Como Adicionar um Novo Vídeo
 
-Na seção "Intervalos de Bloqueio" do `VRManager`:
+1. Clique no botão "Adicionar Novo Vídeo".
+2. Digite o nome exato do arquivo de vídeo, incluindo a extensão (ex: "rio.mp4").
+3. Clique em "OK".
 
-1. Defina o tamanho da lista `Lock Time Ranges` com o número de intervalos desejados
-2. Para cada intervalo configure:
-   - `Start Time`: Tempo inicial (em segundos) onde o bloqueio começa
-   - `End Time`: Tempo final (em segundos) onde o bloqueio termina
-   - `Max Angle`: Ângulo máximo de desvio permitido neste intervalo
-   - `Reset Speed`: Velocidade de retorno específica para este intervalo
+### Como Configurar Intervalos de Bloqueio
 
-## Exemplos de Uso
+Para cada vídeo, você pode adicionar quantos intervalos de bloqueio desejar:
 
-### Bloqueio em Momentos Específicos
+1. Expanda a seção do vídeo clicando no botão "►" à esquerda do nome do vídeo.
+2. Clique em "Adicionar Novo Intervalo" para adicionar um intervalo de bloqueio.
+3. Configure:
+   - **Tempo Início**: Momento em segundos em que o bloqueio será ativado.
+   - **Tempo Fim**: Momento em segundos em que o bloqueio será desativado.
+   - **Bloqueio Parcial**: Se marcado, permite restringir apenas uma parte da visão.
+   - **Ângulo de Restrição**: (Apenas para bloqueio parcial) Define o ângulo de visão disponível.
+   - **Yaw (Horizontal)**: Ângulo horizontal para onde o usuário será forçado a olhar (0° = Norte, 90° = Leste, 180° = Sul, 270° = Oeste).
+   - **Pitch (Vertical)**: Ângulo vertical para onde o usuário será forçado a olhar (0° = horizonte, 90° = cima, -90° = baixo).
 
-Para criar um bloqueio entre 30s e 45s do vídeo:
-```
-Start Time: 30
-End Time: 45
-Max Angle: 30
-Reset Speed: 1.5
-```
+## Como Testar e Ajustar os Ângulos
 
-### Bloqueio Progressivamente Mais Restritivo
+Para encontrar os ângulos corretos, você pode usar:
 
-Para criar uma sequência de bloqueios cada vez mais restritos:
+1. **No Editor**: Use o componente `ViewSetup` que mostra os ângulos atuais da câmera.
+   - Entre no modo Play.
+   - Utilize o modo VR e olhe na direção desejada.
+   - No console, serão exibidos os ângulos atuais a cada poucos frames.
+   - Use esses valores para configurar os ângulos de bloqueio.
 
-**Intervalo 1:**
-```
-Start Time: 10
-End Time: 20
-Max Angle: 45
-Reset Speed: 1
-```
+2. **No dispositivo Quest**: 
+   - Pressione o botão A do controle para exibir no console os ângulos atuais.
+   - Anote esses valores para usar na configuração posteriormente.
 
-**Intervalo 2:**
-```
-Start Time: 30
-End Time: 40
-Max Angle: 30
-Reset Speed: 1.5
-```
+## Ferramentas de Teste
 
-**Intervalo 3:**
-```
-Start Time: 50
-End Time: 60
-Max Angle: 15
-Reset Speed: 2
-```
+No modo Play, a seção "Ferramentas de Teste" permite testar a visualização em ângulos específicos:
 
-## Dicas de Configuração
+1. Expanda a seção "Ferramentas de Teste".
+2. Configure os ângulos Yaw e Pitch desejados.
+3. Clique em "Testar Visualização" para ver como ficará o bloqueio nessa direção.
 
-- **Teste sempre**: Os valores ideais dependem muito do conteúdo do vídeo
-- **Transições suaves**: Evite mudanças bruscas de ângulos entre intervalos próximos
-- **Velocidade de retorno**: 
-  - Valores baixos (0.5-1.0): Retorno lento e suave
-  - Valores médios (1.5-2.5): Retorno equilibrado (recomendado)
-  - Valores altos (3.0+): Retorno rápido, pode causar desconforto
+## Configuração para Cada Vídeo
+
+Você pode usar estas referências para configurar os pontos de interesse em cada vídeo:
+
+### Rio.mp4
+- Intervalo 1 (00:20-00:44): Use Yaw=0°, Pitch=0° para focar no Cristo Redentor.
+- Intervalo 2 (02:39-03:48): Use Yaw=180°, Pitch=0° para focar na Baía de Guanabara.
+
+### Amazonia.mp4
+- Intervalo 1 (01:55-02:10): Use Yaw=0°, Pitch=0° para focar nas árvores, bloqueio parcial de 120°.
+- Intervalo 2 (03:17-03:25): Use Yaw=180°, Pitch=15° para focar na vista do rio, bloqueio parcial de 100°.
+
+### Noronha.mp4
+- Intervalo 1 (00:40-00:59): Use Yaw=270°, Pitch=0° para focar no mar.
+
+## Dicas Adicionais
+
+- **Modo Recomendado**: O Modo 1 (fixar em ponto específico) geralmente funciona melhor no Meta Quest.
+- **Suavidade da Transição**: Ajuste o valor de `Transition Smoothness` para controlar quão suave é a transição ao entrar ou sair de um bloqueio.
+- **Velocidade de Rotação**: O valor de `Rotation Speed` controla quão rápido a esfera do vídeo gira para acompanhar o movimento da cabeça durante o bloqueio.
 
 ## Solução de Problemas
 
-- **Bloqueio não funciona**: Verifique se `Lock Rotation` está habilitado e se o intervalo está corretamente configurado
-- **Rotação muito rígida**: Diminua a `Reset Speed` ou aumente `Max Angle`
-- **Rotação muito livre**: Aumente a `Reset Speed` ou diminua `Max Angle`
-- **Desconforto no usuário**: A velocidade de retorno pode estar muito alta, reduza para valores abaixo de 2 
+Se o bloqueio não estiver funcionando corretamente:
+
+1. **Verifique as referências**: Certifique-se de que o `videoSphere` está corretamente atribuído.
+2. **Modo de bloqueio**: Tente alternar entre os modos 0 e 1 para ver qual funciona melhor.
+3. **Logs de debug**: Ative o `diagnosticMode` para ver mais informações no console.
+4. **Referência correta da câmera**: O sistema tenta automaticamente encontrar a câmera do Quest, mas verifique se está sendo usada a câmera correta nos logs. 

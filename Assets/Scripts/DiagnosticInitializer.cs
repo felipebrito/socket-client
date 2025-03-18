@@ -1,121 +1,207 @@
 using UnityEngine;
-using UnityEngine.UI;
-using TMPro;
-using System.Collections;
+using UnityEngine.SceneManagement;
 
+// Adicione essa diretiva para os trechos que usam o SDK do Oculus
+#if USING_OCULUS_SDK
+using Oculus.VR;
+#endif
+
+/// <summary>
+/// Adiciona automaticamente os componentes de diagnóstico ao iniciar a cena.
+/// Este script deve ser adicionado a um GameObject na cena inicial.
+/// </summary>
 public class DiagnosticInitializer : MonoBehaviour
 {
-    [SerializeField] private GameObject diagnosticCanvasPrefab;
-    [SerializeField] private bool enableOnStart = true;
-    [SerializeField] private KeyCode toggleKey = KeyCode.D;
+    [Tooltip("Se verdadeiro, cria automaticamente a interface de diagnóstico na inicialização")]
+    public bool createOnStart = true;
     
-    private GameObject diagnosticCanvas;
-    private DiagnosticUI diagnosticUI;
+    [Tooltip("Se verdadeiro, cria a interface apenas se ocorrer um erro")]
+    public bool createOnError = true;
     
-    private void Start()
+    [Tooltip("Se verdadeiro, permite ativar diagnóstico com botão do controle")]
+    public bool enableEmergencyButton = true;
+    
+    [Tooltip("Número de vezes que o botão B ou Y precisa ser pressionado em 3 segundos")]
+    public int buttonPressCount = 3;
+    
+    private float buttonTimer = 0f;
+    private int currentPressCount = 0;
+    private DiagnosticUI diagUI;
+    private bool showingDiagnostic = false;
+    
+    void Awake()
     {
-        InitializeDiagnostic();
+        // Não destruir ao carregar novas cenas
+        DontDestroyOnLoad(gameObject);
+        
+        // Registrar para detecção de erros
+        Application.logMessageReceived += OnLogMessage;
     }
     
-    private void InitializeDiagnostic()
+    void Start()
     {
-        if (diagnosticCanvasPrefab != null)
+        if (createOnStart)
         {
-            // Instanciar o prefab do canvas de diagnóstico
-            diagnosticCanvas = Instantiate(diagnosticCanvasPrefab, Vector3.zero, Quaternion.identity);
-            diagnosticUI = diagnosticCanvas.GetComponentInChildren<DiagnosticUI>();
-            
-            // Configurar visibilidade inicial
-            if (diagnosticCanvas.activeSelf != enableOnStart)
+            CreateDiagnosticUI();
+        }
+    }
+    
+    void Update()
+    {
+        // Verificar botão de emergência (botão B/Y do Quest ou tecla D no teclado)
+        if (enableEmergencyButton)
+        {
+            CheckEmergencyButton();
+        }
+    }
+    
+    // Detecta pressionamento do botão de emergência
+    void CheckEmergencyButton()
+    {
+        bool buttonPressed = false;
+        
+        // Verificar controle VR Oculus - Botão B ou Y
+        #if UNITY_ANDROID && !UNITY_EDITOR && USING_OCULUS_SDK
+        // Verifica botão B (mão direita) ou Y (mão esquerda)
+        if (OVRInput.GetDown(OVRInput.Button.Two) || OVRInput.GetDown(OVRInput.Button.Four))
+        {
+            buttonPressed = true;
+        }
+        #else
+        // No editor ou outras plataformas, usar tecla D
+        if (Input.GetKeyDown(KeyCode.D))
+        {
+            buttonPressed = true;
+        }
+        #endif
+        
+        // Processar pressionamento
+        if (buttonPressed)
+        {
+            // Se o timer expirou, reinicia a contagem
+            if (buttonTimer <= 0)
             {
-                diagnosticCanvas.SetActive(enableOnStart);
+                currentPressCount = 1;
+                buttonTimer = 3.0f; // 3 segundos para pressionar múltiplas vezes
+                Debug.Log("Botão de emergência: 1º toque");
             }
+            else
+            {
+                // Incrementa contador de pressionamentos
+                currentPressCount++;
+                Debug.Log($"Botão de emergência: {currentPressCount}º toque");
+                
+                // Verifica se atingiu o número necessário
+                if (currentPressCount >= buttonPressCount)
+                {
+                    ToggleDiagnosticUI();
+                    // Reset
+                    currentPressCount = 0;
+                    buttonTimer = 0;
+                }
+            }
+        }
+        
+        // Atualiza o timer
+        if (buttonTimer > 0)
+        {
+            buttonTimer -= Time.deltaTime;
+            if (buttonTimer <= 0)
+            {
+                // Timer expirou sem completar sequência
+                currentPressCount = 0;
+            }
+        }
+    }
+    
+    // Alterna a exibição do diagnóstico
+    void ToggleDiagnosticUI()
+    {
+        if (showingDiagnostic)
+        {
+            HideDiagnosticUI();
         }
         else
         {
-            // Criar canvas e componentes necessários em runtime
-            diagnosticCanvas = new GameObject("DiagnosticCanvas");
-            Canvas canvas = diagnosticCanvas.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.WorldSpace;
-            
-            CanvasScaler scaler = diagnosticCanvas.AddComponent<CanvasScaler>();
-            scaler.dynamicPixelsPerUnit = 10;
-            
-            diagnosticCanvas.AddComponent<GraphicRaycaster>();
-            
-            // Criar o painel de fundo
-            GameObject panel = new GameObject("DiagnosticPanel");
-            panel.transform.SetParent(diagnosticCanvas.transform, false);
-            
-            RectTransform panelRect = panel.AddComponent<RectTransform>();
-            panelRect.sizeDelta = new Vector2(0.3f, 0.2f);
-            panelRect.localPosition = new Vector3(0f, 0f, 0.5f);
-            
-            Image panelImage = panel.AddComponent<Image>();
-            panelImage.color = new Color(0f, 0f, 0f, 0.7f);
-            
-            // Criar texto de debug
-            GameObject textObj = new GameObject("DebugText");
-            textObj.transform.SetParent(panel.transform, false);
-            
-            RectTransform textRect = textObj.AddComponent<RectTransform>();
-            textRect.sizeDelta = new Vector2(0.28f, 0.18f);
-            textRect.localPosition = Vector3.zero;
-            
-            TextMeshProUGUI debugText = textObj.AddComponent<TextMeshProUGUI>();
-            debugText.fontSize = 0.01f;
-            debugText.color = Color.white;
-            debugText.alignment = TextAlignmentOptions.TopLeft;
-            debugText.text = "Carregando diagnóstico...";
-            
-            // Adicionar componente DiagnosticUI
-            diagnosticUI = panel.AddComponent<DiagnosticUI>();
-            diagnosticUI.enabled = enableOnStart;
-            
-            // Configurar campo de texto
-            diagnosticUI.GetType().GetField("debugText", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(diagnosticUI, debugText);
-            
-            // Posicionar na frente da câmera
-            if (Camera.main != null)
-            {
-                Transform camTransform = Camera.main.transform;
-                diagnosticCanvas.transform.position = camTransform.position + camTransform.forward * 1.5f;
-                diagnosticCanvas.transform.rotation = camTransform.rotation;
-            }
-            
-            diagnosticCanvas.SetActive(enableOnStart);
+            ShowDiagnosticUI();
         }
     }
     
-    private void Update()
+    // Mostra a interface de diagnóstico
+    void ShowDiagnosticUI()
     {
-        // Verificar tecla para alternar visibilidade
-        if (Input.GetKeyDown(toggleKey))
+        DiagnosticUI diagInstance = FindObjectOfType<DiagnosticUI>();
+        if (diagInstance != null)
         {
-            ToggleDiagnosticVisibility();
+            diagInstance.ShowDiagnostic();
+            showingDiagnostic = true;
+            Debug.Log("Interface de diagnóstico ativada via botão de emergência");
+        }
+        else
+        {
+            CreateDiagnosticUI();
+            showingDiagnostic = true;
+        }
+    }
+    
+    // Oculta a interface de diagnóstico
+    void HideDiagnosticUI()
+    {
+        DiagnosticUI diagInstance = FindObjectOfType<DiagnosticUI>();
+        if (diagInstance != null)
+        {
+            diagInstance.HideDiagnostic();
+            showingDiagnostic = false;
+            Debug.Log("Interface de diagnóstico desativada via botão de emergência");
+        }
+    }
+    
+    // Detectar mensagens de erro
+    void OnLogMessage(string logString, string stackTrace, LogType type)
+    {
+        if (createOnError && (type == LogType.Error || type == LogType.Exception))
+        {
+            // Criar interface de diagnóstico se ocorrer erro crítico
+            CreateDiagnosticUI();
+        }
+    }
+    
+    void CreateDiagnosticUI()
+    {
+        // Verificar se já existe uma interface de diagnóstico
+        DiagnosticUI existingUI = FindObjectOfType<DiagnosticUI>();
+        if (existingUI == null)
+        {
+            // Criar novo objeto para a interface
+            GameObject diagObj = new GameObject("DiagnosticUI");
+            diagUI = diagObj.AddComponent<DiagnosticUI>();
+            
+            // Não destruir ao carregar novas cenas
+            DontDestroyOnLoad(diagObj);
+            
+            Debug.Log("Interface de diagnóstico criada automaticamente.");
+        }
+        else
+        {
+            diagUI = existingUI;
         }
         
-        // Manter o canvas sempre visível no editor durante o desenvolvimento
-        #if UNITY_EDITOR
-        if (diagnosticCanvas != null && Camera.main != null)
+        // Mostrar a interface
+        if (diagUI != null)
         {
-            Transform camTransform = Camera.main.transform;
-            diagnosticCanvas.transform.position = camTransform.position + camTransform.forward * 1.5f;
-            diagnosticCanvas.transform.rotation = camTransform.rotation;
+            diagUI.ShowDiagnostic();
+            showingDiagnostic = true;
         }
-        #endif
     }
     
-    public void ToggleDiagnosticVisibility()
+    public static void ShowDiagnostic()
     {
-        if (diagnosticCanvas != null)
-        {
-            diagnosticCanvas.SetActive(!diagnosticCanvas.activeSelf);
-            
-            if (diagnosticUI != null)
-            {
-                diagnosticUI.enabled = diagnosticCanvas.activeSelf;
-            }
-        }
+        DiagnosticUI.ShowDiagnosticUI();
+    }
+    
+    void OnDestroy()
+    {
+        // Remover listener ao destruir
+        Application.logMessageReceived -= OnLogMessage;
     }
 } 

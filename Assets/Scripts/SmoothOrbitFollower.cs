@@ -2,70 +2,67 @@ using UnityEngine;
 
 public class SmoothOrbitFollower : MonoBehaviour
 {
-    public Transform target;
-    public float followSpeed = 2.0f;
-    public float maxDistance = 45.0f;
-    public bool inverseRotation = true;
-    public bool lockVertical = false;
-    public bool lockHorizontal = false;
+    [Header("Follow Settings")]
+    [Tooltip("A câmera que o objeto vai seguir")]
+    public Transform cameraToFollow;
     
-    private Quaternion targetRotation;
-    private Quaternion initialRotation;
-    private Vector3 initialForward;
+    [Tooltip("Distância que o objeto mantém da câmera")]
+    public float orbitDistance = 2f;
     
-    private void Start()
+    [Tooltip("Velocidade de suavização do movimento (quanto maior, mais suave)")]
+    public float smoothSpeed = 5f;
+    
+    [Tooltip("Offset vertical em relação à câmera")]
+    public float heightOffset = 0f;
+
+    private Vector3 targetPosition;
+    private Vector3 currentVelocity;
+
+    void Start()
     {
-        if (target == null)
+        // Se não foi atribuída uma câmera, usar a principal
+        if (cameraToFollow == null)
         {
-            Debug.LogWarning("SmoothOrbitFollower: Target transform não definido!");
-            enabled = false;
-            return;
+            cameraToFollow = Camera.main.transform;
         }
         
-        initialRotation = transform.rotation;
-        initialForward = transform.forward;
+        // Posicionar inicialmente na frente da câmera
+        transform.position = cameraToFollow.position + cameraToFollow.forward * orbitDistance;
     }
-    
-    private void LateUpdate()
+
+    void Update()
     {
-        if (target == null) return;
+        if (cameraToFollow == null) return;
+
+        // Calcular a posição alvo na direção do olhar da câmera
+        Vector3 cameraForward = cameraToFollow.forward;
+        cameraForward.y = 0; // Manter sempre na mesma altura se desejado
+        cameraForward = cameraForward.normalized;
+
+        // Calcular a posição alvo
+        targetPosition = cameraToFollow.position + cameraForward * orbitDistance;
         
-        // Calcula direção desejada
-        Vector3 targetDirection = target.forward;
-        
-        // Verifica se precisamos de rotação inversa
-        if (inverseRotation)
-        {
-            targetDirection = -targetDirection;
-        }
-        
-        // Aplica restrições de rotação
-        if (lockVertical)
-        {
-            targetDirection.y = initialForward.y;
-        }
-        
-        if (lockHorizontal)
-        {
-            targetDirection.x = initialForward.x;
-        }
-        
-        // Calcula a rotação alvo
-        targetRotation = Quaternion.LookRotation(targetDirection);
-        
-        // Limita a rotação ao ângulo máximo
-        float angle = Quaternion.Angle(initialRotation, targetRotation);
-        if (angle > maxDistance)
-        {
-            targetRotation = Quaternion.RotateTowards(initialRotation, targetRotation, maxDistance);
-        }
-        
-        // Aplica rotação suave
-        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * followSpeed);
+        // Adicionar offset de altura
+        targetPosition.y += heightOffset;
+
+        // Suavizar o movimento usando SmoothDamp
+        transform.position = Vector3.SmoothDamp(
+            transform.position,
+            targetPosition,
+            ref currentVelocity,
+            1f / smoothSpeed
+        );
+
+        // Fazer o objeto sempre olhar para a câmera
+        transform.LookAt(cameraToFollow);
     }
-    
-    public void ResetRotation()
+
+    // Método para visualizar o raio de órbita no editor
+    void OnDrawGizmosSelected()
     {
-        transform.rotation = initialRotation;
+        if (cameraToFollow == null) return;
+
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(cameraToFollow.position, orbitDistance);
     }
 } 
