@@ -4,6 +4,7 @@ using UnityEngine.Video;
 using System.Linq;
 using AparatoCustomAttributes;
 using TMPro;
+using System;
 
 public class VideoRotationControl : MonoBehaviour
 {
@@ -29,6 +30,7 @@ public class VideoRotationControl : MonoBehaviour
     private double lastCheckTime = -1;
     private double videoLength = 0;
     private bool isRotationControlEnabled = false;
+    private double currentVideoTime = 0;
     
     // Propriedade pública para acessar o estado do controle de rotação
     public bool IsRotationControlEnabled => isRotationControlEnabled;
@@ -36,6 +38,12 @@ public class VideoRotationControl : MonoBehaviour
     // Cache de valores para processamento mais rápido
     private readonly List<int> blockTimeIndices = new List<int>();
     private Dictionary<string, VideoBlock> videoBlockLookup = new Dictionary<string, VideoBlock>();
+
+    private float transitionSpeed = 1.5f; // Velocidade reduzida para transição mais suave
+    private bool isTransitioning = false;
+    private Vector3 targetRotation = Vector3.zero;
+    private CameraMovementSimulator cameraSimulator;
+    private Vector3 lastRotation; // Guarda a última rotação antes de desativar para transição suave ao liberar
 
     [System.Serializable]
     public class VideoBlock
@@ -56,8 +64,8 @@ public class VideoRotationControl : MonoBehaviour
     [System.Serializable]
     public class BlockTime
     {
-        public double startTime;
-        public double endTime;
+        public float startTime;
+        public float endTime;
         
         public override string ToString()
         {
@@ -73,8 +81,214 @@ public class VideoRotationControl : MonoBehaviour
     private void Start()
     {
         InitializeComponents();
+        SetRotationControlEnabled(false);
+        
+        Debug.Log("=== Configuração de Blocos ===");
+        foreach (var kvp in videoBlockLookup)
+        {
+            Debug.Log($"Vídeo: {kvp.Key}");
+            Debug.Log($"  Ângulo: {kvp.Value.angle}°");
+            foreach (var timeBlock in kvp.Value.blockTimes)
+            {
+                Debug.Log($"  Bloco: {timeBlock.startTime:F1}s - {timeBlock.endTime:F1}s");
+            }
+        }
+        Debug.Log("==============================");
     }
-    
+
+    public void UpdateVideoTime(double time)
+    {
+        currentVideoTime = time;
+        CheckTimeBlocks();
+    }
+
+    private void CheckTimeBlocks()
+    {
+        if (videoPlayer == null || !videoPlayer.isPlaying || currentVideoBlock == null) return;
+
+        float currentTime = (float)videoPlayer.time;
+        bool isInAnyBlock = false;
+
+        foreach (var timeBlock in currentVideoBlock.blockTimes)
+        {
+            if (currentTime >= timeBlock.startTime && currentTime <= timeBlock.endTime)
+            {
+                isInAnyBlock = true;
+                
+                // Força um ângulo mínimo de 45 graus se o configurado for 0
+                float effectiveAngle = currentVideoBlock.angle <= 0 ? 45f : currentVideoBlock.angle;
+                
+                // Ativa o limitador com o ângulo efetivo
+                if (cameraLimiter != null)
+                {
+                    // Primeiro desativa o simulador para evitar interferência
+                    if (cameraSimulator != null)
+                    {
+                        cameraSimulator.SetSimulationActive(false);
+                    }
+
+                    // Força posição zero imediatamente em toda a hierarquia
+                    Transform mainCamera = Camera.main?.transform;
+                    if (mainCamera != null)
+                    {
+                        // Reseta todas as rotações para zero
+                        Transform root = mainCamera;
+                        while (root.parent != null)
+                        {
+                            root = root.parent;
+                        }
+                        
+                        // Aplica zero do root até a câmera
+                        Stack<Transform> hierarchy = new Stack<Transform>();
+                        Transform current = mainCamera;
+                        while (current != null)
+                        {
+                            hierarchy.Push(current);
+                            current = current.parent;
+                        }
+                        
+                        while (hierarchy.Count > 0)
+                        {
+                            Transform t = hierarchy.Pop();
+                            t.localRotation = Quaternion.identity;
+                            t.localEulerAngles = Vector3.zero;
+                        }
+                    }
+
+                    // Configura o limitador após zerar as posições
+                    cameraLimiter.IsLimitActive = true;
+                    cameraLimiter.angle = effectiveAngle;
+                    
+                    Debug.Log($"🎯 Limite de rotação definido: ±{effectiveAngle:F1}°");
+                }
+                
+                currentTimeBlockInfo = timeBlock.ToString();
+                Debug.Log($"🔒 Dentro do bloco: {currentTimeBlockInfo}");
+                break;
+            }
+        }
+
+        if (!isInAnyBlock && cameraLimiter != null)
+        {
+            cameraLimiter.IsLimitActive = false;
+            currentTimeBlockInfo = string.Empty;
+            
+            // Reativa o simulador apenas quando sair do bloco
+            if (cameraSimulator != null)
+            {
+                cameraSimulator.SetSimulationActive(true);
+                cameraSimulator.SetMovementIntensity(1.0f);
+            }
+            
+            Debug.Log("🔓 Fora de blocos de tempo - rotação livre");
+        }
+    }
+
+    private void StartTransitionToZero()
+    {
+        if (!isTransitioning)
+        {
+            isTransitioning = true;
+            targetRotation = Vector3.zero;
+            
+            // Guarda a rotação atual para transição suave ao liberar
+            if (cameraLimiter != null && cameraLimiter.transform.parent != null)
+            {
+                lastRotation = cameraLimiter.transform.parent.localEulerAngles;
+            }
+            
+            // Desativa temporariamente o simulador durante a transição
+            if (cameraSimulator != null)
+            {
+                cameraSimulator.SetSimulationActive(false);
+            }
+            
+            Debug.Log("🔄 Iniciando transição suave para posição inicial");
+        }
+    }
+
+    private void UpdateTransition()
+    {
+        if (!isTransitioning || cameraLimiter == null) return;
+
+        Transform mainCamera = Camera.main?.transform;
+        if (mainCamera == null) return;
+
+        // Pega a rotação atual da câmera principal
+        Vector3 currentRotation = mainCamera.localEulerAngles;
+        
+        // Normaliza os ângulos para evitar rotações bruscas
+        if (currentRotation.x > 180f) currentRotation.x -= 360f;
+        if (currentRotation.y > 180f) currentRotation.y -= 360f;
+        if (currentRotation.z > 180f) currentRotation.z -= 360f;
+
+        // Calcula a diferença total para o alvo
+        float totalDifference = Vector3.Distance(currentRotation, targetRotation);
+        
+        // Se estiver próximo o suficiente do alvo, finaliza a transição
+        if (totalDifference < 0.1f)
+        {
+            // Garante que todos os componentes estejam na posição correta
+            mainCamera.localEulerAngles = targetRotation;
+            
+            // Se estiver indo para zero, força zero em toda a hierarquia
+            if (targetRotation == Vector3.zero)
+            {
+                Transform current = mainCamera;
+                while (current != null)
+                {
+                    current.localEulerAngles = Vector3.zero;
+                    current = current.parent;
+                }
+                
+                if (cameraLimiter.sphereTransform != null)
+                {
+                    cameraLimiter.sphereTransform.localEulerAngles = Vector3.zero;
+                }
+            }
+            
+            // Reativa o simulador apenas se não estiver em modo bloqueado
+            if (cameraSimulator != null && !cameraLimiter.IsLimitActive)
+            {
+                cameraSimulator.SetSimulationActive(true);
+                cameraSimulator.SetMovementIntensity(1.0f);
+            }
+            
+            isTransitioning = false;
+            Debug.Log("✅ Transição completada suavemente");
+            return;
+        }
+
+        // Calcula o passo da transição
+        float step = transitionSpeed * Time.deltaTime * 30f;
+        Vector3 newRotation = Vector3.Lerp(currentRotation, targetRotation, step);
+
+        // Aplica a nova rotação na câmera principal
+        mainCamera.localEulerAngles = newRotation;
+        
+        // Durante a transição para zero, mantém toda a hierarquia alinhada
+        if (targetRotation == Vector3.zero)
+        {
+            Transform current = mainCamera;
+            while (current != null)
+            {
+                current.localEulerAngles = Vector3.zero;
+                current = current.parent;
+            }
+            
+            if (cameraLimiter.sphereTransform != null)
+            {
+                cameraLimiter.sphereTransform.localEulerAngles = Vector3.zero;
+            }
+        }
+        
+        // Log da transição a cada mudança significativa
+        if (totalDifference >= 15f)
+        {
+            Debug.Log($"🔄 Transição suave: {currentRotation:F1} → {newRotation:F1}");
+        }
+    }
+
     private void PrepareBlockLookups()
     {
         videoBlockLookup.Clear();
@@ -86,6 +300,7 @@ public class VideoRotationControl : MonoBehaviour
             if (!string.IsNullOrEmpty(block.videoTitle) && !videoBlockLookup.ContainsKey(block.videoTitle))
             {
                 videoBlockLookup[block.videoTitle] = block;
+                Debug.Log($"Configurado bloco para vídeo: {block.videoTitle} com {block.blockTimes.Count} blocos de tempo");
             }
         }
         
@@ -131,16 +346,19 @@ public class VideoRotationControl : MonoBehaviour
             {
                 messageText = FindObjectOfType<TextMeshProUGUI>();
             }
-            
-            if (messageText == null)
-            {
-                Debug.LogWarning("VideoRotationControl: TextMeshProUGUI não encontrado. As mensagens de status não serão exibidas.");
-            }
         }
 
         videoPlayer.started += OnVideoStarted;
         videoPlayer.loopPointReached += OnVideoEnded;
         isInitialized = true;
+        Debug.Log("VideoRotationControl inicializado");
+
+        // Cache do simulador
+        cameraSimulator = FindObjectOfType<CameraMovementSimulator>();
+        if (cameraSimulator == null)
+        {
+            Debug.LogWarning("VideoRotationControl: CameraMovementSimulator não encontrado.");
+        }
     }
 
     void OnDestroy()
@@ -155,113 +373,88 @@ public class VideoRotationControl : MonoBehaviour
     public void SetRotationControlEnabled(bool enabled)
     {
         isRotationControlEnabled = enabled;
-        if (!enabled && cameraLimiter != null)
-        {
-            cameraLimiter.IsLimitActive = false;
-            currentTimeBlockInfo = string.Empty;
-        }
-        Debug.Log($"VideoRotationControl: Controle de rotação {(enabled ? "ativado" : "desativado")}");
-    }
-
-    void Update()
-    {
-        if (!isInitialized)
-        {
-            if (Time.frameCount % 60 == 0)
-                InitializeComponents();
-            return;
-        }
         
-        if (!isRotationControlEnabled || videoPlayer == null || cameraLimiter == null || !videoPlayer.isPlaying || videoPlayer.clip == null) 
+        if (cameraLimiter != null)
         {
-            if (cameraLimiter != null && cameraLimiter.IsLimitActive)
+            cameraLimiter.enabled = enabled;
+            cameraLimiter.IsLimitActive = enabled;
+            
+            if (enabled)
             {
-                cameraLimiter.IsLimitActive = false;
-                currentTimeBlockInfo = string.Empty;
-                Debug.Log($"❌ Controle de rotação desativado: {(!isRotationControlEnabled ? "Controle desativado" : !videoPlayer.isPlaying ? "Vídeo não está tocando" : "Componentes faltando")}");
-            }
-            return;
-        }
-
-        if (currentVideoBlock == null)
-        {
-            if (videoPlayer.clip != null)
-            {
-                OnVideoStarted(videoPlayer);
-                if (currentVideoBlock == null)
+                // Primeiro desativa o simulador
+                if (cameraSimulator != null)
                 {
-                    cameraLimiter.IsLimitActive = false;
-                    currentTimeBlockInfo = string.Empty;
-                    Debug.Log($"❌ Controle de rotação desativado: Nenhuma configuração encontrada para o vídeo {videoPlayer.clip.name}");
-                    return;
+                    cameraSimulator.SetSimulationActive(false);
+                }
+                
+                // Força posição zero imediatamente
+                Transform mainCamera = Camera.main?.transform;
+                if (mainCamera != null)
+                {
+                    Transform root = mainCamera;
+                    while (root.parent != null)
+                    {
+                        root = root.parent;
+                    }
+                    
+                    Stack<Transform> hierarchy = new Stack<Transform>();
+                    Transform current = mainCamera;
+                    while (current != null)
+                    {
+                        hierarchy.Push(current);
+                        current = current.parent;
+                    }
+                    
+                    while (hierarchy.Count > 0)
+                    {
+                        Transform t = hierarchy.Pop();
+                        t.localRotation = Quaternion.identity;
+                        t.localEulerAngles = Vector3.zero;
+                    }
                 }
             }
-            else return;
-        }
-
-        double currentTime = videoPlayer.time;
-        
-        if (Time.frameCount % 60 == 0)
-        {
-            string blockStatus = cameraLimiter.IsLimitActive ? "🔒 BLOQUEADO" : "🔓 DESBLOQUEADO";
-            Debug.Log($"⏱️ Tempo: {currentTime:F1}s | Estado: {blockStatus} | Ângulo: {cameraLimiter.angle:F1}°");
-        }
-
-        bool foundActiveBlock = false;
-        BlockTime activeBlock = null;
-        
-        foreach (var block in currentVideoBlock.blockTimes)
-        {
-            if (currentTime >= block.startTime && currentTime <= block.endTime)
+            else
             {
-                foundActiveBlock = true;
-                activeBlock = block;
-                break;
+                // Reativa o simulador apenas quando desativar o controle
+                if (cameraSimulator != null)
+                {
+                    cameraSimulator.SetSimulationActive(true);
+                    cameraSimulator.SetMovementIntensity(1.0f);
+                }
             }
+            
+            Debug.Log($"CameraLimiter: {(enabled ? "ativado" : "desativado")} e posição {(enabled ? "zerada" : "liberada")}");
         }
-
-        if (foundActiveBlock)
-        {
-            if (!cameraLimiter.IsLimitActive)
-            {
-                cameraLimiter.angle = currentVideoBlock.angle;
-                cameraLimiter.IsLimitActive = true;
-                currentTimeBlock = activeBlock;
-                currentTimeBlockInfo = $"🔒 {activeBlock}";
-                Debug.Log($"🔒 Bloqueio ativado em {currentTime:F1}s | Bloco: {activeBlock} | Ângulo: {currentVideoBlock.angle:F1}°");
-            }
-        }
-        else if (cameraLimiter.IsLimitActive)
-        {
-            cameraLimiter.IsLimitActive = false;
-            currentTimeBlock = null;
-            currentTimeBlockInfo = string.Empty;
-            Debug.Log($"🔓 Bloqueio desativado em {currentTime:F1}s");
-        }
-
-        if (messageText != null)
-        {
-            messageText.text = currentTimeBlockInfo;
-        }
+        
+        Debug.Log($"VideoRotationControl: Controle de rotação {(enabled ? "ativado" : "desativado")}");
     }
 
     private void OnVideoStarted(VideoPlayer player)
     {
-        if (player == null || player.clip == null) return;
+        if (player == null) return;
         
         string videoName = System.IO.Path.GetFileName(player.url);
-        currentVideoTitleID = videoName;
+        Debug.Log($"Vídeo iniciado: {videoName}");
         
+        // Procura configuração para este vídeo
         if (videoBlockLookup.TryGetValue(videoName, out VideoBlock block))
         {
             currentVideoBlock = block;
-            videoLength = player.clip.length;
-            Debug.Log($"✅ Configuração encontrada para o vídeo {videoName} com {block.blockTimes.Count} blocos de tempo");
+            currentVideoTitleID = videoName;
+            Debug.Log($"Configuração encontrada para {videoName}:");
+            Debug.Log($"  Ângulo: {block.angle}°");
+            foreach (var timeBlock in block.blockTimes)
+            {
+                Debug.Log($"  Bloco: {timeBlock.startTime:F1}s - {timeBlock.endTime:F1}s");
+            }
+            
+            // Ativa o controle de rotação
+            SetRotationControlEnabled(true);
         }
         else
         {
-            currentVideoBlock = null;
-            Debug.Log($"❌ Nenhuma configuração encontrada para o vídeo {videoName}");
+            Debug.LogWarning($"Nenhuma configuração encontrada para o vídeo: {videoName}");
+            SetRotationControlEnabled(false);
         }
     }
 
@@ -272,5 +465,39 @@ public class VideoRotationControl : MonoBehaviour
         currentTimeBlockInfo = string.Empty;
         cameraLimiter.IsLimitActive = false;
         Debug.Log("🔄 Vídeo finalizado, controle de rotação resetado");
+    }
+
+    private void Update()
+    {
+        if (videoPlayer != null && videoPlayer.isPlaying)
+        {
+            currentVideoTime = videoPlayer.time;
+            
+            // Debug do tempo a cada segundo
+            if (Time.frameCount % 60 == 0)
+            {
+                Debug.Log($"⏱️ Tempo do vídeo: {currentVideoTime:F1}s");
+                
+                // Verifica e corrige a posição se necessário
+                if (cameraLimiter != null && cameraLimiter.IsLimitActive)
+                {
+                    Transform mainCamera = Camera.main?.transform;
+                    if (mainCamera != null && mainCamera.localEulerAngles != Vector3.zero)
+                    {
+                        Debug.Log("⚠️ Corrigindo desvio de posição da câmera");
+                        mainCamera.localEulerAngles = Vector3.zero;
+                        
+                        Transform current = mainCamera;
+                        while (current != null)
+                        {
+                            current.localEulerAngles = Vector3.zero;
+                            current = current.parent;
+                        }
+                    }
+                }
+            }
+            
+            CheckTimeBlocks();
+        }
     }
 }
