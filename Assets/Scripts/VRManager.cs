@@ -203,12 +203,6 @@ public class VRManager : MonoBehaviour
         {
             CheckConnection();
         }
-
-        // Enviar timecode se estiver reproduzindo
-        if (isPlaying && videoPlayer != null)
-        {
-            SendTimecode();
-        }
     }
 
     private void OnApplicationQuit()
@@ -594,6 +588,23 @@ public class VRManager : MonoBehaviour
             Debug.LogError("Fade material é null no OnVideoStarted!");
         }
         
+        // Mantém o simulador ativo mas com movimento reduzido durante o vídeo
+        var simulator = FindObjectOfType<CameraMovementSimulator>();
+        if (simulator != null)
+        {
+            simulator.SetSimulationActive(true);
+            simulator.SetMovementIntensity(0.3f); // Reduz a intensidade do movimento durante o vídeo
+        }
+
+        // Exibe o estado do controle de rotação
+        if (rotationControl != null)
+        {
+            Debug.Log("=== Estado do Controle de Rotação ===");
+            Debug.Log($"Controle de rotação: {(rotationControl.IsRotationControlEnabled ? "Ativado" : "Desativado")}");
+            Debug.Log($"Rotação travada: {isRotationLocked}");
+            Debug.Log("=====================================");
+        }
+        
         OnVideoStateChanged?.Invoke(true, currentVideo);
     }
 
@@ -602,6 +613,14 @@ public class VRManager : MonoBehaviour
         // Fade out quando o vídeo termina
         StartCoroutine(FadeOut(() => {
             isPlaying = false;
+            
+            // Restaura a intensidade normal do movimento após o vídeo
+            var simulator = FindObjectOfType<CameraMovementSimulator>();
+            if (simulator != null)
+            {
+                simulator.SetMovementIntensity(1.0f);
+            }
+            
             OnVideoStateChanged?.Invoke(false, currentVideo);
         }));
     }
@@ -897,15 +916,22 @@ public class VRManager : MonoBehaviour
     {
         if (videoPlayer != null && videoPlayer.isPlaying)
         {
-            float currentTime = (float)videoPlayer.time;
-            string timecodeMessage = $"TIMECODE:{currentTime:F1}";
-
-            Debug.Log($"⏱️ Enviando timecode: {timecodeMessage}");
-
-            if (webSocket != null && webSocket.State == WebSocketState.Open)
+            double currentTime = videoPlayer.time;
+            Debug.Log($"⏱️ Enviando timecode: TIMECODE:{currentTime:F1}");
+            
+            // Envia o timecode para o VideoRotationControl
+            if (rotationControl != null)
             {
-                byte[] data = Encoding.UTF8.GetBytes(timecodeMessage);
-                webSocket.SendAsync(new ArraySegment<byte>(data), WebSocketMessageType.Text, true, System.Threading.CancellationToken.None);
+                rotationControl.UpdateVideoTime(currentTime);
+            }
+            else
+            {
+                // Tenta encontrar o VideoRotationControl se ainda não foi encontrado
+                rotationControl = FindObjectOfType<VideoRotationControl>();
+                if (rotationControl == null)
+                {
+                    Debug.LogWarning("VideoRotationControl não encontrado para envio de timecode");
+                }
             }
         }
     }
@@ -978,7 +1004,6 @@ public class VRManager : MonoBehaviour
         {
             fadeAlpha += Time.deltaTime * fadeSpeed;
             fadeMaterial.SetFloat("_Alpha", fadeAlpha);
-            Debug.Log($"Fade out alpha: {fadeAlpha}");
             yield return null;
         }
         
@@ -1007,7 +1032,6 @@ public class VRManager : MonoBehaviour
         {
             fadeAlpha -= Time.deltaTime * fadeSpeed;
             fadeMaterial.SetFloat("_Alpha", fadeAlpha);
-            Debug.Log($"Fade in alpha: {fadeAlpha}");
             yield return null;
         }
         

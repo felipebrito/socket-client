@@ -28,6 +28,7 @@ public class CameraMovementSimulator : MonoBehaviour
     [Header("Referências (Preenchidas Automaticamente)")]
     public VideoRotationControl rotationController;
     public CameraRotationLimiter rotationLimiter;
+    public VideoPlayer videoPlayer;
     
     // Variáveis privadas
     private Transform cameraTransform;
@@ -38,6 +39,7 @@ public class CameraMovementSimulator : MonoBehaviour
     private float currentAngleLimit = 0f;
     private bool isMovingToInterest = false;
     private float interestAreaProgress = 0f;
+    private bool isSimulationActive = false;
     
     // Constantes
     private const float NOISE_SCALE = 0.5f;
@@ -50,27 +52,37 @@ public class CameraMovementSimulator : MonoBehaviour
     void Start()
     {
         cameraTransform = transform;
+        InitializeComponents();
+        StartCoroutine(SimulateRandomFocus());
         
-        // Inicializa valores aleatórios para cada direção
-        noiseOffset = new Vector3(
-            Random.Range(0f, 100f),
-            Random.Range(0f, 100f),
-            Random.Range(0f, 100f)
-        );
-        
+        // Força a simulação a começar ativa
+        isSimulationActive = true;
+        Debug.Log("Simulador iniciado. Estado inicial da simulação: " + (isSimulationActive ? "Ativo" : "Inativo"));
+    }
+
+    private void InitializeComponents()
+    {
         // Auto-detecção dos componentes
         if (rotationController == null)
         {
             rotationController = FindObjectOfType<VideoRotationControl>();
             if (rotationController == null)
             {
-                Debug.LogWarning("VideoRotationControl não encontrado! A simulação não focará em áreas de interesse.");
+                Debug.LogError("VideoRotationControl não encontrado! A simulação não funcionará corretamente.");
+            }
+            else
+            {
+                Debug.Log("VideoRotationControl encontrado: " + rotationController.name);
             }
         }
         
         if (rotationLimiter == null && rotationController != null)
         {
             rotationLimiter = rotationController.cameraLimiter;
+            if (rotationLimiter != null)
+            {
+                Debug.Log("CameraRotationLimiter encontrado através do VideoRotationControl");
+            }
         }
         
         if (rotationLimiter == null)
@@ -80,49 +92,104 @@ public class CameraMovementSimulator : MonoBehaviour
             {
                 rotationLimiter = FindObjectOfType<CameraRotationLimiter>();
             }
+            
+            if (rotationLimiter == null)
+            {
+                Debug.LogError("CameraRotationLimiter não encontrado! O bloqueio não funcionará.");
+            }
+            else
+            {
+                Debug.Log("CameraRotationLimiter encontrado: " + rotationLimiter.name);
+            }
+        }
+
+        if (videoPlayer == null)
+        {
+            videoPlayer = GetComponentInParent<VideoPlayer>();
+            if (videoPlayer == null)
+            {
+                videoPlayer = FindObjectOfType<VideoPlayer>();
+            }
+            
+            if (videoPlayer != null)
+            {
+                videoPlayer.started += OnVideoStarted;
+                videoPlayer.loopPointReached += OnVideoEnded;
+                Debug.Log("VideoPlayer encontrado e eventos configurados: " + videoPlayer.name);
+            }
+            else
+            {
+                Debug.LogError("VideoPlayer não encontrado! A simulação não sincronizará com o vídeo.");
+            }
         }
         
-        // Iniciar a simulação
-        StartCoroutine(SimulateRandomFocus());
+        // Inicializa valores aleatórios para cada direção
+        ResetNoiseOffset();
+        
+        // Log do estado inicial
+        Debug.Log($"Estado dos componentes:\n" +
+                 $"- VideoRotationControl: {(rotationController != null ? "OK" : "Faltando")}\n" +
+                 $"- CameraRotationLimiter: {(rotationLimiter != null ? "OK" : "Faltando")}\n" +
+                 $"- VideoPlayer: {(videoPlayer != null ? "OK" : "Faltando")}");
+    }
+
+    void OnDestroy()
+    {
+        if (videoPlayer != null)
+        {
+            videoPlayer.started -= OnVideoStarted;
+            videoPlayer.loopPointReached -= OnVideoEnded;
+        }
+    }
+
+    private void OnVideoStarted(VideoPlayer vp)
+    {
+        isSimulationActive = true;
+        ResetNoiseOffset();
+        Debug.Log("Simulação iniciada com o vídeo");
+    }
+
+    private void OnVideoEnded(VideoPlayer vp)
+    {
+        isSimulationActive = false;
+        Debug.Log("Simulação parada com o fim do vídeo");
+    }
+
+    private void ResetNoiseOffset()
+    {
+        noiseOffset = new Vector3(
+            Random.Range(0f, 100f),
+            Random.Range(0f, 100f),
+            Random.Range(0f, 100f)
+        );
     }
     
     void Update()
     {
-        // Verifica se o controle de rotação está habilitado
-        if (rotationController != null && !rotationController.IsRotationControlEnabled)
+        // Verifica se pode executar
+        if (!isSimulationActive)
         {
-            isLimitActive = false;
             return;
         }
 
         // Verifica se o limitador está ativo
-        bool wasLimitActive = isLimitActive;
-        isLimitActive = rotationLimiter != null && rotationLimiter.IsLimitActive;
+        bool isLimited = rotationLimiter != null && rotationLimiter.IsLimitActive;
         
-        // Quando entra em um bloco de limitação
-        if (!wasLimitActive && isLimitActive)
+        if (isLimited)
         {
-            OnEnterLimitedArea();
+            // Se estiver limitado, para o movimento
+            Debug.Log($"Movimento pausado - Limitador ativo com ângulo: {rotationLimiter.angle}°");
+            return;
         }
-        // Quando sai de um bloco de limitação
-        else if (wasLimitActive && !isLimitActive)
-        {
-            OnExitLimitedArea();
-        }
-        
-        if (isLimitActive && focusOnInterestAreas)
-        {
-            // Quando em uma área limitada, foca no centro do interesse
-            SimulateFocusedMovement();
-        }
-        else
-        {
-            // Movimento livre randomizado
-            SimulateBrownianMovement();
-        }
+
+        // Movimento livre randomizado apenas quando não estiver limitado
+        SimulateBrownianMovement();
         
         // Aplica a rotação à câmera
-        cameraTransform.localEulerAngles = targetRotation;
+        if (cameraTransform != null)
+        {
+            cameraTransform.localEulerAngles = targetRotation;
+        }
     }
     
     // Movimento browniano para simular um usuário explorando livremente
@@ -215,6 +282,7 @@ public class CameraMovementSimulator : MonoBehaviour
     {
         currentBlockInfo = "";
         isMovingToInterest = false;
+        ResetNoiseOffset();
         Debug.Log("<color=cyan>Bloqueio Desativado:</color> Movimento livre restaurado");
     }
     
@@ -223,17 +291,12 @@ public class CameraMovementSimulator : MonoBehaviour
     {
         while (true)
         {
-            // Espera um tempo aleatório antes de mudar o foco
             yield return new WaitForSeconds(Random.Range(5f, 15f));
             
-            // Só muda o foco se estiver em uma área livre
-            if (!isLimitActive && !isMovingToInterest)
+            if (isSimulationActive && !isLimitActive && !isMovingToInterest)
             {
-                noiseOffset = new Vector3(
-                    Random.Range(0f, 100f),
-                    Random.Range(0f, 100f),
-                    0f
-                );
+                ResetNoiseOffset();
+                Debug.Log("Mudando foco aleatório");
             }
         }
     }
@@ -241,23 +304,31 @@ public class CameraMovementSimulator : MonoBehaviour
     // Desenha indicadores visuais na tela
     void OnGUI()
     {
-        if (!showVisualIndicators || !isLimitActive) return;
+        // Sempre mostra o estado da simulação
+        GUI.Label(new Rect(10, 10, 300, 20), $"Simulação: {(isSimulationActive ? "Ativa" : "Inativa")}");
         
-        // Obtém o centro da tela
+        if (!showVisualIndicators || !isSimulationActive) return;
+        
+        // Informações detalhadas
+        float y = 30;
+        GUI.Label(new Rect(10, y, 300, 20), $"Estado: {(isLimitActive ? "🔒 BLOQUEADO" : "🔓 LIVRE")}"); y += 20;
+        
+        if (rotationLimiter != null)
+        {
+            GUI.Label(new Rect(10, y, 300, 20), $"Ângulo: {rotationLimiter.angle:F1}°"); y += 20;
+        }
+        
+        if (rotationController != null)
+        {
+            GUI.Label(new Rect(10, y, 300, 20), $"Bloco: {rotationController.currentTimeBlockInfo}"); y += 20;
+        }
+        
+        // Desenha um crosshair no centro
         Vector2 center = new Vector2(Screen.width / 2, Screen.height / 2);
-        
-        // Desenha o indicador central
-        GUI.color = centerIndicatorColor;
-        GUI.Box(new Rect(center.x - 15, center.y - 15, 30, 30), "");
-        
-        // Informações do bloqueio
-        GUIStyle style = new GUIStyle(GUI.skin.label);
-        style.alignment = TextAnchor.UpperCenter;
-        style.fontSize = 14;
-        style.normal.textColor = centerIndicatorColor;
-        
-        GUI.Label(new Rect(0, 20, Screen.width, 30), 
-            $"BLOQUEIO ATIVO: {currentBlockInfo} | Limite: ±{currentAngleLimit:F0}°", style);
+        float size = 20;
+        GUI.color = isLimitActive ? Color.red : Color.white;
+        GUI.DrawTexture(new Rect(center.x - 1, center.y - size/2, 2, size), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(center.x - size/2, center.y - 1, size, 2), Texture2D.whiteTexture);
     }
     
     // Desenha visualizações na cena
@@ -286,5 +357,39 @@ public class CameraMovementSimulator : MonoBehaviour
             Gizmos.DrawRay(transform.position, directionToInterest * 3f);
             Gizmos.DrawSphere(transform.position + directionToInterest * 3f, 0.1f);
         }
+    }
+
+    public void SetSimulationActive(bool active)
+    {
+        isSimulationActive = active;
+        Debug.Log($"Simulação {(active ? "ativada" : "desativada")}");
+    }
+
+    public void SetMovementIntensity(float intensity)
+    {
+        movementIntensity = Mathf.Clamp01(intensity);
+        Debug.Log($"Intensidade do movimento ajustada para: {movementIntensity}");
+    }
+
+    public void OnBlockActivated(float angle)
+    {
+        isLimitActive = true;
+        currentAngleLimit = angle;
+        Debug.Log($"Simulador: Bloco ativado com ângulo {angle}°");
+        
+        // Reseta o movimento para evitar transições bruscas
+        targetRotation = cameraTransform.localEulerAngles;
+        ResetNoiseOffset();
+    }
+
+    public void OnBlockDeactivated()
+    {
+        isLimitActive = false;
+        currentAngleLimit = 0f;
+        Debug.Log("Simulador: Bloco desativado");
+        
+        // Reseta o movimento para evitar transições bruscas
+        targetRotation = cameraTransform.localEulerAngles;
+        ResetNoiseOffset();
     }
 } 

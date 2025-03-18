@@ -17,8 +17,9 @@ public class CameraRotationLimiter : MonoBehaviour
     // Cache de componentes e valores frequentemente acessados
     private Transform _transform;
     private Quaternion initialRotation;
-    private float currentRotationY;
     private bool referencesInitialized = false;
+    private Vector3 lastRotation;
+    private bool wasLimitActive = false;
     
     // Cache para cálculos
     private static readonly Vector3 RotationAxis = Vector3.up;
@@ -27,16 +28,12 @@ public class CameraRotationLimiter : MonoBehaviour
     // Para ajudar com o debug
     private float lastAngleLimit = 0;
 
-    void Awake()
-    {
-        // Cache da referência ao transform para evitar acessos repetidos
-        _transform = transform;
-    }
-
     void Start()
     {
+        _transform = transform;
         InitializeReferences();
         initialRotation = _transform.rotation;
+        lastRotation = _transform.localEulerAngles;
     }
 
     // Inicializa referências automaticamente se necessário
@@ -44,43 +41,56 @@ public class CameraRotationLimiter : MonoBehaviour
     {
         if (sphereTransform == null)
         {
-            // Tenta encontrar automaticamente - geralmente é o pai ou um objeto relacionado
             sphereTransform = _transform.parent;
             if (sphereTransform != null)
             {
-                Debug.LogWarning("CameraRotationLimiter: Sphere Transform foi atribuído automaticamente ao pai. Verifique se está correto.");
+                Debug.Log("CameraRotationLimiter: Sphere Transform atribuído ao pai");
             }
             else
             {
-                Debug.LogError("CameraRotationLimiter: Sphere Transform não foi encontrado. O limitador não funcionará corretamente.");
+                Debug.LogError("CameraRotationLimiter: Sphere Transform não encontrado!");
                 return;
             }
         }
 
         if (videoPlayer == null)
         {
-            // Tenta encontrar o VideoPlayer no pai ou no atual GameObject
             videoPlayer = GetComponentInParent<VideoPlayer>();
-            if (videoPlayer == null && sphereTransform != null)
+            if (videoPlayer == null)
             {
-                videoPlayer = sphereTransform.GetComponentInChildren<VideoPlayer>();
+                videoPlayer = FindObjectOfType<VideoPlayer>();
             }
             
             if (videoPlayer == null)
             {
-                Debug.LogWarning("CameraRotationLimiter: VideoPlayer não encontrado automaticamente. Algumas funções podem não funcionar.");
+                Debug.LogWarning("CameraRotationLimiter: VideoPlayer não encontrado");
             }
         }
 
         referencesInitialized = true;
+        Debug.Log("CameraRotationLimiter inicializado");
     }
 
     void Update()
     {
-        // Garante que as referências estão inicializadas
-        if (!EnsureReferences())
+        if (!referencesInitialized)
         {
+            InitializeReferences();
             return;
+        }
+
+        // Detecta mudança no estado do limitador
+        if (IsLimitActive != wasLimitActive)
+        {
+            wasLimitActive = IsLimitActive;
+            if (IsLimitActive)
+            {
+                Debug.Log($"Limitador ativado - Ângulo: {angle}°");
+            }
+            else
+            {
+                Debug.Log("Limitador desativado");
+            }
         }
 
         // Verifica se o vídeo está tocando ou se o limitador está ativo
@@ -112,49 +122,66 @@ public class CameraRotationLimiter : MonoBehaviour
             sphereTransform.gameObject.SetActive(videoPlayer != null && videoPlayer.isPlaying);
         }
 
-        // Se o limitador estiver ativo, aplica a limitação
+        // Se o limitador estiver ativo, aplica as restrições
         if (IsLimitActive)
         {
-            // Obtém a rotação atual da câmera
-            Vector3 currentRotation = _transform.localEulerAngles;
-            float currentYaw = currentRotation.y;
-            if (currentYaw > 180) currentYaw -= 360;
-
-            // Se a rotação exceder o limite
-            if (Mathf.Abs(currentYaw) > angle)
+            // Obtém a rotação atual
+            Vector3 currentRotation = transform.localEulerAngles;
+            
+            // Converte o ângulo para o intervalo -180 a 180
+            float currentY = currentRotation.y;
+            if (currentY > 180f) currentY -= 360f;
+            
+            // Aplica o limite de forma mais restritiva
+            float limitedY = Mathf.Clamp(currentY, -angle, angle);
+            
+            // Se houver diferença, força a rotação para dentro dos limites
+            if (!Mathf.Approximately(currentY, limitedY))
             {
-                // Calcula a rotação alvo
-                float clampedYaw = Mathf.Clamp(currentYaw, -angle, angle);
-                Quaternion targetRotation = Quaternion.Euler(
-                    currentRotation.x,
-                    clampedYaw,
-                    currentRotation.z
-                );
-
-                // Aplica a rotação suave
-                _transform.rotation = Quaternion.Lerp(
-                    _transform.rotation,
-                    targetRotation,
-                    resetSpeed * Time.deltaTime
-                );
-
-                // Log detalhado quando a limitação é aplicada
-                Debug.Log($"🔄 Aplicando limitação de rotação - Ângulo atual: {currentYaw:F1}°, Limite: ±{angle:F1}°, Velocidade: {resetSpeed:F1}");
+                Debug.Log($"🔒 Forçando rotação: {currentY:F1}° -> {limitedY:F1}° (limite: ±{angle:F1}°)");
+                currentRotation.y = limitedY;
+                transform.localEulerAngles = currentRotation;
+                
+                // Força a esfera a ficar centralizada
+                if (sphereTransform != null)
+                {
+                    Vector3 sphereRotation = sphereTransform.localEulerAngles;
+                    sphereRotation.y = 0;
+                    sphereTransform.localEulerAngles = sphereRotation;
+                }
+            }
+            
+            // Impede qualquer movimento adicional
+            if (transform.parent != null)
+            {
+                transform.parent.localRotation = Quaternion.identity;
             }
         }
     }
 
-    private bool EnsureReferences()
+    void OnDrawGizmos()
     {
-        if (!referencesInitialized)
-        {
-            InitializeReferences();
-            if (!referencesInitialized)
-            {
-                Debug.LogError("CameraRotationLimiter: Referências não inicializadas corretamente.");
-                return false;
-            }
-        }
-        return true;
+        if (!IsLimitActive || !Application.isPlaying) return;
+
+        // Desenha os limites de rotação
+        Vector3 position = transform.position;
+        float radius = 1f;
+
+        // Desenha o arco dos limites
+        UnityEditor.Handles.color = Color.yellow;
+        UnityEditor.Handles.DrawWireArc(
+            position,
+            Vector3.up,
+            Quaternion.Euler(0, -angle, 0) * transform.forward,
+            angle * 2,
+            radius
+        );
+
+        // Desenha as linhas dos limites
+        Gizmos.color = Color.red;
+        Vector3 leftLimit = Quaternion.Euler(0, -angle, 0) * transform.forward * radius;
+        Vector3 rightLimit = Quaternion.Euler(0, angle, 0) * transform.forward * radius;
+        Gizmos.DrawLine(position, position + leftLimit);
+        Gizmos.DrawLine(position, position + rightLimit);
     }
 }
