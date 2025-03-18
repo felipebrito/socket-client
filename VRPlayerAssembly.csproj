@@ -58,16 +58,22 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets\Scripts\DiagnosticInitializer.cs" />
-    <Compile Include="Assets\Scripts\Editor\ReadOnlyDrawer.cs" />
-    <Compile Include="Assets\Scripts\ViewSetup.cs" />
+    <Compile Include="Assets\Scripts\VideoRotationControl.cs" />
+    <Compile Include="Assets\Scripts\CameraRotationLimiter.cs" />
     <Compile Include="Assets\Scripts\DiagnosticUI.cs" />
+    <Compile Include="Assets\Scripts\Editor\CustomEditorAttributes.cs" />
     <Compile Include="Assets\Scripts\ConnectionHelper.cs" />
+    <Compile Include="Assets\Scripts\Editor\VideoRotationControlEditor.cs" />
     <Compile Include="Assets\Scripts\VRManager.cs" />
-    <Compile Include="Assets\Scripts\Editor\VRManagerEditor.cs" />
+    <Compile Include="Assets\Scripts\Editor\ViewSetupMigration.cs" />
     <Compile Include="Assets\Scripts\RotationDebugUI.cs" />
     <Compile Include="Assets\Scripts\SmoothOrbitFollower.cs" />
+    <Compile Include="Assets\Scripts\Editor\RemoveViewSetupMenu.cs" />
+    <Compile Include="Assets\Scripts\Editor\AparatoMenuHelper.cs" />
+    <Compile Include="Assets\Scripts\Editor\AparatoEditorUtils.cs" />
     <Compile Include="Assets\Scripts\EmergencyStartup.cs" />
     <Compile Include="Assets\Scripts\NewtonsoftJsonTest.cs" />
+    <Compile Include="Assets\Scripts\CameraMovementSimulator.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\Scripts\VRPlayerAssembly.asmdef" />

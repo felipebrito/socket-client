@@ -275,4 +275,109 @@ The type or namespace name 'Newtonsoft' could not be found (are you missing a us
 
 ### Instruções de uso:
 
-Se você ainda encontrar problemas com o Newtonsoft.Json, consulte o documento de instalação detalhado em `Assets/Scripts/Docs/InstalacaoNewtonsoft.md`. 
+Se você ainda encontrar problemas com o Newtonsoft.Json, consulte o documento de instalação detalhado em `Assets/Scripts/Docs/InstalacaoNewtonsoft.md`.
+
+# Controle de Rotação para Vídeos 360°
+
+Este sistema permite controlar a rotação da câmera em momentos específicos durante a reprodução de vídeos 360°. O controle é feito através do componente `VideoRotationControl`, que gerencia blocos de tempo onde a rotação da câmera é limitada.
+
+## Componentes Principais
+
+### VideoRotationControl
+- Gerencia os blocos de tempo e o controle de rotação
+- Configura os limites de rotação da câmera
+- Monitora o tempo do vídeo e aplica restrições
+- Interface amigável no Inspector para configuração
+
+### VRManager (Camada de Compatibilidade)
+- Mantém compatibilidade com scripts existentes
+- Delega o controle de rotação para o VideoRotationControl
+- Gerencia o estado de reprodução do vídeo
+- Fornece interface de debug e diagnóstico
+
+### CameraRotationLimiter
+- Aplica os limites de rotação na câmera
+- Controla a velocidade de retorno ao centro
+- Gerencia ângulos máximos de rotação
+
+### VideoPlayer
+- Reproduz os vídeos 360°
+- Fornece eventos de controle de reprodução
+- Gerencia o estado de reprodução
+
+## Configuração
+
+### 1. Configurando Blocos de Tempo
+
+1. Selecione o objeto que contém o componente `VideoRotationControl` no Inspector
+2. Na seção "Configuração de Vídeos", você verá a lista de blocos de vídeo
+3. Para cada vídeo que precisa de controle de rotação:
+   - Clique em "Adicionar Novo Vídeo"
+   - Digite o nome do arquivo de vídeo (ex: "rio.mp4")
+   - Defina o ângulo máximo de rotação (padrão: 75°)
+   - Adicione os blocos de tempo clicando em "Adicionar Bloco de Tempo"
+   - Para cada bloco, defina:
+     - Tempo inicial (formato: mm:ss)
+     - Tempo final (formato: mm:ss)
+
+### 2. Configurando o VRManager
+
+1. Adicione o componente `VRManager` ao objeto que gerencia o sistema VR
+2. Configure as referências necessárias:
+   - Main Camera: câmera principal do VR
+   - Video Sphere: objeto onde o vídeo é projetado
+   - Video Player: componente que reproduz o vídeo
+3. Ajuste as configurações de debug se necessário:
+   - Enable Rotation Debug: ativa visualização de debug
+   - Is Rotation Locked: força bloqueio de rotação
+   - Max Vertical/Horizontal Angle: ângulos máximos
+
+### 3. Exemplo de Configuração
+
+Para o vídeo "rio.mp4", os seguintes blocos de tempo são configurados:
+- 00:00 até 00:05 (primeiros 5 segundos)
+- 00:20 até 00:44 (entre 20s e 44s)
+- 02:39 até 03:48 (entre 159s e 228s)
+
+## Funcionamento
+
+1. Quando um vídeo começa a ser reproduzido:
+   - O VRManager atualiza o estado de reprodução
+   - O VideoRotationControl verifica se há configurações para o vídeo
+   - O sistema de bloqueio é ativado se necessário
+
+2. Durante a reprodução:
+   - O VideoRotationControl monitora o tempo atual
+   - Quando entra em um bloco de tempo:
+     - A rotação da câmera é limitada ao ângulo definido
+     - Uma mensagem é exibida na tela
+   - Ao sair do bloco, a rotação volta ao normal
+
+3. Sistema de Debug:
+   - Interface visual para monitoramento
+   - Logs detalhados no console
+   - Ferramentas de teste no Inspector
+
+## Ferramentas de Teste
+
+O editor inclui ferramentas para testar a configuração:
+1. Expanda a seção "Ferramentas de Teste" no Inspector do VideoRotationControl
+2. Digite o nome do vídeo que deseja testar
+3. Use os botões "Testar Vídeo" e "Parar Teste" para verificar o funcionamento
+
+## Logs e Depuração
+
+O sistema gera logs detalhados para ajudar na depuração:
+- ✅ Quando uma configuração é carregada
+- 🔒 Quando um bloqueio é ativado
+- 🔓 Quando um bloqueio é desativado
+- ❌ Quando há problemas ou erros
+- ⏱️ Status atual do vídeo (a cada segundo)
+
+## Notas Importantes
+
+1. Os blocos de tempo são ordenados automaticamente por tempo inicial
+2. O nome do arquivo de vídeo deve corresponder exatamente ao arquivo em StreamingAssets
+3. Certifique-se de que todos os componentes necessários estão presentes na cena
+4. O ângulo de rotação é aplicado igualmente para todos os blocos de tempo de um mesmo vídeo
+5. A camada de compatibilidade (VRManager) é temporária e será removida em versões futuras

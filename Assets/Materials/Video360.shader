@@ -1,16 +1,14 @@
-Shader "Custom/Unlit_Inverted"
+Shader "Custom/Video360"
 {
     Properties
     {
         _MainTex ("Texture", 2D) = "black" {}
-        _Alpha ("Alpha", Range(0, 1)) = 1
     }
     SubShader
     {
-        Tags { "RenderType"="Transparent" "Queue"="Transparent+1" }
-        Blend SrcAlpha OneMinusSrcAlpha
+        Tags { "RenderType"="Opaque" "Queue"="Geometry" }
         Cull Front
-        ZWrite Off
+        ZWrite On
 
         Pass
         {
@@ -33,7 +31,6 @@ Shader "Custom/Unlit_Inverted"
 
             sampler2D _MainTex;
             float4 _MainTex_ST;
-            float _Alpha;
 
             v2f vert (appdata v)
             {
@@ -45,11 +42,9 @@ Shader "Custom/Unlit_Inverted"
 
             fixed4 frag (v2f i) : SV_Target
             {
-                fixed4 col = tex2D(_MainTex, i.uv);
-                col.a = _Alpha;
-                return col;
+                return tex2D(_MainTex, i.uv);
             }
             ENDCG
         }
     }
-}
+} 
