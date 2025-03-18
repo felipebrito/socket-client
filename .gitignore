@@ -63,4 +63,9 @@ Thumbs.db
 *.mov
 *.wmv
 *.avi
-*.mkv 
+*.mkv
+
+# StreamingAssets content but keep the directory and .meta files
+/[Aa]ssets/StreamingAssets/*
+!/[Aa]ssets/StreamingAssets/.gitkeep
+!/[Aa]ssets/StreamingAssets/*.meta 
