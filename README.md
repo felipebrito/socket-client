@@ -218,4 +218,37 @@ O aplicativo pode funcionar sem conexão ao servidor:
 
 ## Licença
 
-Todos os direitos reservados. 
+Todos os direitos reservados.
+
+# Atualização 18/03/2025
+
+## Novas Funcionalidades
+- Implementação completa do cliente WebSocket usando SocketIOUnity
+- Sistema de diagnóstico em tempo real com informações de conexão
+- Suporte para reprodução de vídeo de múltiplas fontes
+- Sistema de reconexão automática
+
+## Como Atualizar
+
+### Opção 1: Download Direto
+1. Faça backup do seu projeto atual
+2. Baixe a versão mais recente em: https://github.com/felipebrito/socket-client
+3. Substitua os arquivos existentes pelos novos
+
+### Opção 2: Atualização via Git
+```bash
+git pull origin main
+```
+
+## Configuração do Servidor
+
+O sistema agora suporta comunicação com servidor Socket.IO. Configure o endereço em:
+1. Selecione o objeto [MANAGER] na cena
+2. Localize o componente `VRManager` 
+3. Configure a propriedade `Server Uri` (ex: `ws://192.168.1.30:8181`)
+
+## Instruções Detalhadas
+
+Consulte os arquivos de documentação em `Assets/Scripts/Docs/` para informações detalhadas sobre:
+- Configuração de bloqueio de rotação (`GuiaDeBloqueio.md`)
+- Registro completo de alterações (`Alteracoes.md`) 
