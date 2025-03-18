@@ -251,4 +251,28 @@ O sistema agora suporta comunicação com servidor Socket.IO. Configure o endere
 
 Consulte os arquivos de documentação em `Assets/Scripts/Docs/` para informações detalhadas sobre:
 - Configuração de bloqueio de rotação (`GuiaDeBloqueio.md`)
-- Registro completo de alterações (`Alteracoes.md`) 
+- Registro completo de alterações (`Alteracoes.md`)
+
+## Atualização 24/03/2025 - Correção do Erro de Referência do Newtonsoft.Json
+
+Foi implementada uma solução para o erro de referência do Newtonsoft.Json reportado anteriormente:
+
+```
+The type or namespace name 'Newtonsoft' could not be found (are you missing a using directive or an assembly reference?)
+```
+
+### Soluções implementadas:
+
+1. Adicionado o pacote oficial do Newtonsoft.Json via Package Manager (versão 3.2.1)
+2. Criados Assembly Definition Files para garantir as referências corretas:
+   - `NewtonsoftJsonAssembly.asmdef` - Referência principal para Newtonsoft.Json
+   - `VRPlayerAssembly.asmdef` - Para scripts principais do projeto
+   - `SocketIOUnityAssembly.asmdef` - Para o plugin SocketIOUnity
+   - `SocketIONewtonsoftJsonAssembly.asmdef` - Para a integração específica com Newtonsoft
+
+3. Implementado `link.xml` para evitar stripping de código durante build IL2CPP
+4. Criada cena de teste `NewtonsoftTest` para verificar a funcionalidade
+
+### Instruções de uso:
+
+Se você ainda encontrar problemas com o Newtonsoft.Json, consulte o documento de instalação detalhado em `Assets/Scripts/Docs/InstalacaoNewtonsoft.md`. 
